@@ -9,7 +9,7 @@
 
 struct tokenizedCommand{
 	char *command;
-	char *argv[4]; //NOTE hardcoded for now
+	char *argv[64]; //NOTE hardcoded for now, EDIT changed to 64 can you just leave it like this ?
 	int argc;
 }tokenizedCommand;
 
@@ -30,7 +30,6 @@ struct tokenizedCommand* tokenizeInput(char *userCommand, int *numCommands){
 	char *savePipePtr, *saveArgsPtr;
 	char *pipeToken = strtok_r(userCommand, "|", &savePipePtr); //first pipe
 	while(pipeToken != NULL){
-		printf("Full subcommand %s\n", pipeToken);
 		int argc = 1;
 	
 
@@ -59,15 +58,15 @@ struct tokenizedCommand* tokenizeInput(char *userCommand, int *numCommands){
 			pipelineArray[count].argv[2] = strdup(destination);
 			argc++;
 		}
-		printf("Command: %s Flags: %s Dest: %s\n",
-				command, flags ? flags : "(No)\n", destination ? destination : "(No)\n");
+		//printf("Command: %s Flags: %s Dest: %s\n",
+				//command, flags ? flags : "(No)\n", destination ? destination : "(No)\n");
 
 		pipelineArray[count].argv[3] = NULL;
 		pipelineArray[count].argc = argc;
 
 		pipeToken = strtok_r(NULL, "|", &savePipePtr);
 		count++;
-		(*numCommands) = count;
+		(*numCommands) = count; //tells main how many pipes to pass to pipelineProcess
 	}
 
 	return pipelineArray;
@@ -79,12 +78,8 @@ void execute(struct tokenizedCommand *cmd){
 		exit(0);
 	}
 
-	char binaryCommand[1028] = "";
-	snprintf(binaryCommand, sizeof(binaryCommand) , "/usr/bin/%s", (*cmd).command);
-	fflush(stdout);
-	printf("\n%s\n", binaryCommand);
-	fflush(stdout);
 	execvp((*cmd).command, (*cmd).argv);
+
 	perror("Exec failed");
 	exit(1);
 }
@@ -151,7 +146,6 @@ int main(){
 
 		if(strcmp(command, "cd") == 0){
 			chdir(pipeline->argv[1]);
-			printf("CD\n");
 		} else{
 			pipelineProcess(pipeline, numCommands);
 		}
