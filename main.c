@@ -14,9 +14,8 @@ struct tokenizedCommand{
 }tokenizedCommand;
 
 
-struct tokenizedCommand * tokenizeInput(char *userCommand){
+struct tokenizedCommand* tokenizeInput(char *userCommand, int *numCommands){
 	
-
 	int count = 1;
 	for(char *p = userCommand; *p; p++){
 		if(*p == '|') count++;
@@ -28,19 +27,19 @@ struct tokenizedCommand * tokenizeInput(char *userCommand){
 
 
 	count = 0;
-	int argc = 1;
 	char *savePipePtr, *saveArgsPtr;
 	char *pipeToken = strtok_r(userCommand, "|", &savePipePtr); //first pipe
 	while(pipeToken != NULL){
 		printf("Full subcommand %s\n", pipeToken);
+		int argc = 1;
 	
 
 		//now get fullfirst command
 		char *subCommand = strtok_r(pipeToken, " ", &saveArgsPtr);
 		char *command = subCommand;
 
-		pipelineArray[count].command = command;
-		pipelineArray[count].argv[0] = command;
+		pipelineArray[count].command = strdup(command);
+		pipelineArray[count].argv[0] = strdup(command);
 
 		char *flags = NULL;
 		char *destination = NULL;
@@ -49,7 +48,7 @@ struct tokenizedCommand * tokenizeInput(char *userCommand){
 		subCommand = strtok_r(NULL, " ", &saveArgsPtr);
 		if(subCommand) {
 			flags = subCommand;
-			pipelineArray[count].argv[1]= flags;
+			pipelineArray[count].argv[1]= strdup(flags);
 			argc++;
 		}
 		//pointer to the first instance of " "
@@ -57,17 +56,18 @@ struct tokenizedCommand * tokenizeInput(char *userCommand){
 
 		if(subCommand) {
 			destination = subCommand;
-			pipelineArray[count].argv[2] = destination;
+			pipelineArray[count].argv[2] = strdup(destination);
 			argc++;
 		}
 		printf("Command: %s Flags: %s Dest: %s\n",
-				command, flags ? flags : "(No)", destination ? destination : "(No)");
+				command, flags ? flags : "(No)\n", destination ? destination : "(No)\n");
 
 		pipelineArray[count].argv[3] = NULL;
 		pipelineArray[count].argc = argc;
 
 		pipeToken = strtok_r(NULL, "|", &savePipePtr);
 		count++;
+		(*numCommands) = count;
 	}
 
 	return pipelineArray;
@@ -80,9 +80,11 @@ void execute(struct tokenizedCommand *cmd){
 	}
 
 	char binaryCommand[1028] = "";
-	snprintf(binaryCommand, sizeof(binaryCommand), "/bin/%s", (*cmd).command);
-	
-	execvp(binaryCommand, (*cmd).argv);
+	snprintf(binaryCommand, sizeof(binaryCommand) , "/usr/bin/%s", (*cmd).command);
+	fflush(stdout);
+	printf("\n%s\n", binaryCommand);
+	fflush(stdout);
+	execvp((*cmd).command, (*cmd).argv);
 	perror("Exec failed");
 	exit(1);
 }
@@ -90,56 +92,68 @@ void execute(struct tokenizedCommand *cmd){
 
 void pipelineProcess(struct tokenizedCommand *pipelineArray, int len){
 	int prev_fd = -1;
-
+	pid_t pids[len];
 	for (int i = 0; i < len; i++) {
-	    int fd[2];
-	    if (i < len - 1) pipe(fd);
-
-	    if (fork() == 0) {
-		if (prev_fd != -1) {
-		    dup2(prev_fd, STDIN_FILENO);
-		    close(prev_fd);
-		}
-
-		if (i < len - 1) {
-		    dup2(fd[WRITE_END], STDOUT_FILENO);
-		    close(fd[READ_END]);
-		    close(fd[WRITE_END]);
-		}
+		int fd[2];
+		if (i < len - 1) pipe(fd); //pipe if not last command (n-1)
 		
-		execute(pipelineArray);
-		exit(1);
-	    }
+		pid_t pid = fork(); 
 
-	    if (prev_fd != -1) close(prev_fd);
-	    if (i < len - 1) {
-		close(fd[WRITE_END]);
-		prev_fd = fd[READ_END];
-	    }
+		if (pid == 0) { //child process
+			
+			if (prev_fd != -1) { //aka this is not the first command, also needs both read and write open ?
+				dup2(prev_fd, STDIN_FILENO); //if there was a previous pipe, duplicate prev_fd to stdin
+				close(prev_fd);
+			}
+
+			if (i < len - 1) { //if this isnt last pipe
+				dup2(fd[WRITE_END], STDOUT_FILENO); //close write end to STDOUT
+				close(fd[WRITE_END]);
+				close(fd[READ_END]); //close read end
+			}
+			
+			execute(&pipelineArray[i]); //execute current pipe
+			exit(1);
+
+		} else{ //parent process
+			pids[i] = pid; //adding pid
+			if(prev_fd != -1) close(prev_fd); //if there was a previous pipe
+			if(i < len - 1){
+				prev_fd = fd[READ_END];
+				close(fd[WRITE_END]);
+			}
+		}
+	}
+
+	for(int i = 0; i < len; i++){
+		waitpid(pids[i], NULL, 0);
 	}
 
 }
 
-int main(int argc, char *argv[]){
+int main(){
 	char command[1024] = "";
-	while(strcmp(command, "exit") != 0){
-
+	while(strcmp(command, "exit\n") != 0){
+			
+		fflush(stdout);
 		printf("Enter Command -> ");
+		fflush(stdout);
 		if(!fgets(command, sizeof(command), stdin)){
-			perror("Error parsing command, fgets, line 28");
+			perror("Error parsing command, fgets, line 28\n");
 			exit(1);
 		}
-
+		fflush(stdout);
 		command[strcspn(command, "\r\n")] = '\0'; //reads until carriage return
 		if(strlen(command) == 0) continue; //prints new line on enter ?
 		
-		struct tokenizedCommand *pipeline = tokenizeInput(command);
+		int numCommands = 0;
+		struct tokenizedCommand *pipeline = tokenizeInput(command, &numCommands);
 
 		if(strcmp(command, "cd") == 0){
-			//chdir(flags);
+			chdir(pipeline->argv[1]);
 			printf("CD\n");
 		} else{
-			pipelineProcess(pipeline, pipeline->argc);
+			pipelineProcess(pipeline, numCommands);
 		}
 	}
 	return 0;
