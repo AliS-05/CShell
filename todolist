@@ -1,6 +1,1 @@
-so basically i need to have a function that tokenizes by pipes,
-then a function for executing single commands,
-then use pipe in main along with executing single commands and boom piping in my shell
-
-
-Also fix waiting in main loop, need to wait AFTER creating all children
+Enter Command -> 
