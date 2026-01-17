@@ -1,5 +1,0 @@
--rwxr-xr-x 3 root root       39296 Aug  8  2024 bunzip2
--rwxr-xr-x 3 root root       39296 Aug  8  2024 bzip2
--rwxr-xr-x 1 root root       18736 Aug  8  2024 bzip2recover
--rwxr-xr-x 2 root root        2346 Jan 27  2025 gunzip
--rwxr-xr-x 1 root root       93424 Jan 27  2025 gzip
