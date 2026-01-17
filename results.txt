@@ -1,0 +1,8 @@
+		struct tokenizedCommand *pipeline = tokenizeInput(command, &numCommands);
+	struct tokenizedCommand *pipelineArray = malloc(sizeof(struct tokenizedCommand) * count);
+int checkRedirection(struct tokenizedCommand *pipelineCommand, int *redirectPosition){ //should be passed &pipelineArray[i]
+struct tokenizedCommand* tokenizeInput(char *userCommand, int *numCommands){
+struct tokenizedCommand{
+void execute(struct tokenizedCommand *cmd){
+void pipelineProcess(struct tokenizedCommand *pipelineArray, int len){
+}tokenizedCommand;

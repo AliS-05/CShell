@@ -10,7 +10,7 @@
 
 struct tokenizedCommand{
 	char *command;
-	char *argv[64]; //NOTE hardcoded for now, EDIT changed to 64 can you just leave it like this ?
+	char *argv[64];
 	int argc;
 }tokenizedCommand;
 
@@ -40,7 +40,7 @@ struct tokenizedCommand* tokenizeInput(char *userCommand, int *numCommands){
 		char *subCommand = strtok_r(pipeToken, " ", &saveArgsPtr);
 		char *command = subCommand;
 
-		pipelineArray[count].command = strdup(command);
+		pipelineArray[count].command = strdup(command); //strdup to prevent any weird pointer memory hiccups
 		pipelineArray[count].argv[0] = strdup(command);
 
 
@@ -60,7 +60,6 @@ struct tokenizedCommand* tokenizeInput(char *userCommand, int *numCommands){
 		pipeToken = strtok_r(NULL, "|", &savePipePtr);
 		count++;
 	}
-
 	return pipelineArray;
 }
 
@@ -69,11 +68,11 @@ void execute(struct tokenizedCommand *cmd){
 	if(strcmp((*cmd).command,"exit") == 0){
 		exit(0);
 	}
-	fflush(stdout);
 
+	fflush(stdout);
 	execvp((*cmd).command, (*cmd).argv);
-
 	fflush(stdout);
+
 	perror("Exec failed");
 	exit(1);
 }
@@ -85,7 +84,7 @@ int checkRedirection(struct tokenizedCommand *pipelineCommand, int *redirectPosi
 	int newCount = 0;
 	for(int i = 0; i < pipelineCommand->argc; i++){
 		newCount = strspn(pipelineCommand->argv[i], "<>");
-		if(newCount > count){ //want to immediately return success so not overwritten
+		if(newCount > count){ 
 			count = newCount;
 			(*redirectPosition) = i;
 		}
@@ -168,6 +167,20 @@ void pipelineProcess(struct tokenizedCommand *pipelineArray, int len){
 	}
 }
 
+
+//since pipeline is an array of pointers we must free each one individually
+void freePipeline(struct tokenizedCommand *pipeline, int numCommands){
+	if(pipeline == NULL) return;
+	for(int i = 0; i < numCommands; i++){
+		free(pipeline[i].command);
+		for(int j = 0; j < pipeline[i].argc; j++){
+			free(pipeline[i].argv[j]);
+		}
+	}
+	free(pipeline);
+}
+
+
 int main(){
 	char command[1024] = "";
 	while(strcmp(command, "exit\n") != 0){
@@ -186,11 +199,12 @@ int main(){
 		int numCommands = 0;
 		struct tokenizedCommand *pipeline = tokenizeInput(command, &numCommands);
 
-		if(strcmp(command, "cd") == 0){
+		if(strcmp(pipeline->argv[0], "cd") == 0){
 			chdir(pipeline->argv[1]);
 		} else{
 			pipelineProcess(pipeline, numCommands);
 		}
+		freePipeline(pipeline, numCommands);
 	}
 	return 0;
 }
